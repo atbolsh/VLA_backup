@@ -1,0 +1,11 @@
+---
+description: Do not commit unless asked; do not install or run the full stack on this machine
+alwaysApply: true
+---
+
+# This machine is notes-only
+
+- Commit only when he explicitly asks. Do not offer a commit unprompted, and do not commit "while you're here."
+- Do not install the project, create a venv, download weights, or run `setup.sh` / LIBERO / EO-1 on this machine. The remote vast.ai box has the libraries; this workstation is not configured for them.
+- Simple repo-local checks are fine: read files, syntax/compile of our own modules that do not import torch/LIBERO/EO-1, git status/diff when he asked for a commit.
+- If something needs a GPU or the full stack, write it for the box and say so. Do not try it here.
