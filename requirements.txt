@@ -1,0 +1,31 @@
+# setup.sh installs torch/torchvision from the CUDA index first.
+# Do not use this file as a torch source.
+accelerate
+safetensors
+# transformers 4.5x wants huggingface-hub<1. lerobot 0.3.3 will otherwise
+# float hub to 1.x and break AutoProcessor.
+huggingface-hub>=0.34.2,<1.0
+pillow
+numpy
+einops
+sentencepiece
+protobuf
+qwen-vl-utils
+python-dotenv
+requests
+pyyaml
+transformers>=4.49,<4.58
+# Hub processing_eo1.py imports lerobot. Official EO-1 pin is >=0.3.3,<=0.3.4;
+# 0.3.4 was never published. Do not float to 0.4+ (moved Normalize / FeatureType).
+lerobot==0.3.3
+diffusers>=0.27.2,<0.39
+transforms3d
+gymnasium
+gradio>=4.44,<6
+imageio
+imageio-ffmpeg
+tqdm
+tyro
+opencv-python-headless>=4.9.0
+# LIBERO / robosuite / bddl are installed by setup.sh (git + selected deps).
+# Do not pin LIBERO's ancient requirements.txt (it would replace torch).

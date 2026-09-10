@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "roboenv"
+version = "0.1.0"
+description = "Interactive EO-1 playground on LIBERO"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "robo-env" }]
+
+[tool.setuptools.packages.find]
+where = ["src"]

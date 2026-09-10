@@ -1,0 +1,12 @@
+{
+  "action_chunk_size": 16,
+  "max_action_dim": 32,
+  "max_state_dim": 32,
+  "state_mode": "MEAN_STD",
+  "features": {},
+  "select_action_keys": {},
+  "select_state_keys": {},
+  "select_video_keys": {},
+  "stats": {},
+  "_comment": "setup.sh overwrites this via scripts/build_libero_robot_config.py"
+}
