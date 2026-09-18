@@ -140,6 +140,27 @@ def ensure_mujoco_for_libero() -> None:
     _patch_robosuite_joint_addrs()
 
 
+def _patch_libero_init_state_load() -> None:
+    """LIBERO pickle init files; torch 2.6+ defaults weights_only=True."""
+    import torch
+    from libero.libero import get_libero_path
+    from libero.libero.benchmark import Benchmark
+
+    if getattr(Benchmark.get_task_init_states, "_roboenv_patched", False):
+        return
+
+    def get_task_init_states(self, i):
+        init_states_path = os.path.join(
+            get_libero_path("init_states"),
+            self.tasks[i].problem_folder,
+            self.tasks[i].init_states_file,
+        )
+        return torch.load(init_states_path, map_location="cpu", weights_only=False)
+
+    get_task_init_states._roboenv_patched = True  # type: ignore[attr-defined]
+    Benchmark.get_task_init_states = get_task_init_states
+
+
 def ensure_libero_ready() -> str:
     dest = prepare_libero()
     ensure_mujoco_for_libero()
@@ -160,4 +181,5 @@ def ensure_libero_ready() -> str:
     path = get_libero_path("bddl_files")
     if not Path(path).exists():
         raise RuntimeError(f"LIBERO bddl_files path does not exist: {path}")
+    _patch_libero_init_state_load()
     return path

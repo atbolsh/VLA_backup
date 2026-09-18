@@ -24,6 +24,17 @@ def _ensure_libero_ready() -> None:
     ensure_libero_ready()
 
 
+def _load_task_init_states(suite_obj, task_id: int) -> np.ndarray:
+    import torch
+    from libero.libero import get_libero_path
+
+    task = suite_obj.get_task(task_id)
+    path = Path(get_libero_path("init_states")) / task.problem_folder / task.init_states_file
+    if path.is_file():
+        return np.asarray(torch.load(path, map_location="cpu", weights_only=False))
+    return np.asarray(suite_obj.get_task_init_states(task_id))
+
+
 class LiberoEnv:
     """Thin wrapper around official OffScreenRenderEnv (eval_libero.py)."""
 
@@ -95,7 +106,7 @@ class LiberoEnv:
         )
         env.seed(self.seed)
         self._env = env
-        self._initial_states = np.asarray(suite_obj.get_task_init_states(task_id))
+        self._initial_states = _load_task_init_states(suite_obj, task_id)
         self.suite = suite
         self.task_id = task_id
         self.task_language = str(task.language)

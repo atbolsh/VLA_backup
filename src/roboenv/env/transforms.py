@@ -14,7 +14,27 @@ def dummy_action() -> list[float]:
 
 def rotate180(image: np.ndarray) -> np.ndarray:
     """LIBERO train/eval preprocess: flip agent and wrist views 180 degrees."""
-    return np.ascontiguousarray(image[::-1, ::-1])
+    return np.ascontiguousarray(np.asarray(image)[::-1, ::-1].copy())
+
+
+def to_display_image(image: np.ndarray):
+    """Stable RGB uint8 for Gradio. Copies so the sim cannot rewrite the frame."""
+    from PIL import Image
+
+    arr = np.ascontiguousarray(np.asarray(image)).copy()
+    if arr.ndim == 3 and arr.shape[0] in (1, 3, 4) and arr.shape[-1] not in (1, 3, 4):
+        arr = np.ascontiguousarray(np.transpose(arr, (1, 2, 0)))
+    if arr.dtype != np.uint8:
+        amax = float(np.nanmax(arr)) if arr.size else 0.0
+        if np.isfinite(amax) and amax <= 1.0:
+            arr = np.clip(arr, 0, 1) * 255.0
+        arr = np.nan_to_num(arr, nan=0.0, posinf=255.0, neginf=0.0)
+        arr = np.clip(arr, 0, 255).astype(np.uint8)
+    if arr.ndim == 2:
+        return Image.fromarray(arr, mode="L").convert("RGB")
+    if arr.ndim == 3 and arr.shape[2] == 4:
+        arr = arr[:, :, :3]
+    return Image.fromarray(arr).convert("RGB")
 
 
 def quat2axisangle(quat: np.ndarray) -> np.ndarray:

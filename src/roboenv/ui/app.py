@@ -177,7 +177,8 @@ def build_demo(*, scene_only: bool = False) -> gr.Blocks:
             gr.Markdown(
                 "Public Hub weights are the EO-1-3B generalist. Official 98.2% "
                 "LIBERO is an unpublished 50-epoch tune — drop a checkpoint later "
-                "with `ROBOENV_CKPT`. First **Run** loads the 3B."
+                "with `ROBOENV_CKPT`. First **Run** loads the 3B. Language is "
+                "`model.generate`; the arm is official `select_action`."
             )
 
         with gr.Group():

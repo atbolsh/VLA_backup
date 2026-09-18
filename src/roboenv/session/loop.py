@@ -11,6 +11,7 @@ from PIL import Image
 
 from roboenv.catalog import load_catalog
 from roboenv.env.libero import LiberoEnv
+from roboenv.env.transforms import to_display_image
 from roboenv.policy.eo1 import EO1Policy
 from roboenv.session.conversation import Conversation
 
@@ -74,8 +75,8 @@ class Session:
         obs = self.env.observation()
         return Tick(
             phase=self.phase,
-            agent_view=Image.fromarray(obs.agent_view).convert("RGB"),
-            wrist_view=Image.fromarray(obs.wrist_view).convert("RGB"),
+            agent_view=to_display_image(obs.agent_view),
+            wrist_view=to_display_image(obs.wrist_view),
             language_log=self.language_markdown(),
             instruction=self.instruction,
             steps=self.env.steps,
@@ -155,7 +156,7 @@ class Session:
                     return
 
                 self.phase = PHASE_GENERATING
-                yield self._tick(note="calling processor.generate")
+                yield self._tick(note="model.generate (language) then select_action")
 
                 obs = self.env.observation()
                 try:
@@ -165,6 +166,7 @@ class Session:
                         state=obs.state,
                         task=self.conversation.task,
                         repo_id=self.env.repo_id,
+                        extra_messages=self.conversation.messages,
                     )
                 except Exception as exc:  # noqa: BLE001
                     self.phase = PHASE_FROZEN
