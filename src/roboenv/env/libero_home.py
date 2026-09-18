@@ -8,6 +8,11 @@ from pathlib import Path
 
 from roboenv.paths import repo_root
 
+# robosuite 1.4.x + LIBERO eval images. 3.3.3 darkens floors; 3.4+ breaks
+# libero_spatial init; 3.10+ changes mj_fullM and joint enums.
+PINNED_MUJOCO = "3.3.2"
+_MUJOCO_TOO_NEW = (3, 10, 0)
+
 
 def vendor_libero_root() -> Path:
     return repo_root() / "vendor" / "LIBERO"
@@ -67,8 +72,77 @@ def prepare_libero() -> Path:
     return dest
 
 
+def _mujoco_version() -> tuple[int, ...]:
+    import mujoco
+
+    parts: list[int] = []
+    for token in mujoco.__version__.split("."):
+        digits = "".join(ch for ch in token if ch.isdigit())
+        if not digits:
+            break
+        parts.append(int(digits))
+    return tuple(parts[:3] or [0])
+
+
+def _patch_robosuite_joint_addrs() -> None:
+    """Newer mujoco enums no longer compare equal to numpy jnt_type ints."""
+    import mujoco
+    from robosuite.utils.binding_utils import MjModel
+
+    if getattr(MjModel.get_joint_qpos_addr, "_roboenv_patched", False):
+        return
+
+    free = int(mujoco.mjtJoint.mjJNT_FREE)
+    ball = int(mujoco.mjtJoint.mjJNT_BALL)
+    hinge = int(mujoco.mjtJoint.mjJNT_HINGE)
+    slide = int(mujoco.mjtJoint.mjJNT_SLIDE)
+
+    def _addr(self, name: str, *, vel: bool):
+        joint_id = self.joint_name2id(name)
+        joint_type = int(self.jnt_type[joint_id])
+        if vel:
+            joint_addr = int(self.jnt_dofadr[joint_id])
+            n_free, n_ball = 6, 3
+        else:
+            joint_addr = int(self.jnt_qposadr[joint_id])
+            n_free, n_ball = 7, 4
+        if joint_type == free:
+            return (joint_addr, joint_addr + n_free)
+        if joint_type == ball:
+            return (joint_addr, joint_addr + n_ball)
+        if joint_type not in (hinge, slide):
+            raise AssertionError(
+                f"joint {name!r} has type {joint_type}, expected hinge/slide/ball/free"
+            )
+        return joint_addr
+
+    def get_joint_qpos_addr(self, name):
+        return _addr(self, name, vel=False)
+
+    def get_joint_qvel_addr(self, name):
+        return _addr(self, name, vel=True)
+
+    get_joint_qpos_addr._roboenv_patched = True  # type: ignore[attr-defined]
+    MjModel.get_joint_qpos_addr = get_joint_qpos_addr
+    MjModel.get_joint_qvel_addr = get_joint_qvel_addr
+
+
+def ensure_mujoco_for_libero() -> None:
+    import mujoco
+
+    if _mujoco_version() >= _MUJOCO_TOO_NEW:
+        raise RuntimeError(
+            f"mujoco {mujoco.__version__} is too new for robosuite 1.4 / LIBERO. "
+            "Do not rerun setup.sh. On the box:\n"
+            f"  .venv/bin/python -m pip install 'mujoco=={PINNED_MUJOCO}'\n"
+            "then bash launch.sh"
+        )
+    _patch_robosuite_joint_addrs()
+
+
 def ensure_libero_ready() -> str:
     dest = prepare_libero()
+    ensure_mujoco_for_libero()
     try:
         from libero.libero import get_libero_path
     except EOFError as exc:

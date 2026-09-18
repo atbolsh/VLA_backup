@@ -88,7 +88,7 @@ _try "$VENV_PY" -m pip install -e "$HERE"
 
 # LIBERO: do not install their requirements.txt (ancient torch/transformers).
 _try "$VENV_PY" -m pip install "hydra-core>=1.2" easydict "bddl==1.0.1" future cloudpickle \
-  "gym>=0.25,<0.27" matplotlib "robosuite==1.4.1" mujoco
+  "gym>=0.25,<0.27" matplotlib "robosuite==1.4.1" "mujoco==3.3.2"
 
 if [[ ! -d vendor/LIBERO/.git ]]; then
   mkdir -p vendor
