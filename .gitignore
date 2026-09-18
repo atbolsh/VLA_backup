@@ -22,3 +22,5 @@ scenes/*.json
 .cache/
 hf_cache/
 MUJOCO_LOG.TXT
+
+.env
