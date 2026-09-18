@@ -8,6 +8,7 @@ import numpy as np
 from PIL import Image
 
 from roboenv.catalog import load_catalog
+from roboenv.env.libero_home import ensure_libero_ready
 from roboenv.env.transforms import dummy_action, proprio_state, rotate180
 
 
@@ -20,15 +21,7 @@ class LiberoObs:
 
 
 def _ensure_libero_ready() -> None:
-    try:
-        from libero.libero import get_libero_path
-
-        get_libero_path("bddl_files")
-    except Exception as exc:  # noqa: BLE001
-        raise RuntimeError(
-            "LIBERO is not installed or ~/.libero/config.yaml is missing. "
-            "Run bash setup.sh on the box."
-        ) from exc
+    ensure_libero_ready()
 
 
 class LiberoEnv:

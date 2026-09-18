@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import traceback
 from pathlib import Path
 
 import gradio as gr
@@ -37,7 +38,11 @@ def _error_demo(message: str) -> gr.Blocks:
     with gr.Blocks(title="robo-env error") as demo:
         gr.Markdown("# robo-env failed to start")
         gr.Markdown(f"```\n{message}\n```")
-        gr.Markdown("On the GPU box run `bash setup.sh`, then `bash launch.sh`.")
+        gr.Markdown(
+            "This page is the real exception, not a missing-setup guess. "
+            "`bash launch.sh` must use `.venv/bin/python` (conda `(main)` will steal `python`). "
+            "Re-run setup only if `vendor/LIBERO` is actually missing."
+        )
     return demo
 
 
@@ -46,8 +51,8 @@ def build_demo(*, scene_only: bool = False) -> gr.Blocks:
     default_suite = "libero_object" if "libero_object" in cat.suites else cat.suite_names()[0]
     try:
         session = Session(suite=default_suite, task_id=0, load_policy=False)
-    except Exception as exc:  # noqa: BLE001
-        return _error_demo(f"{type(exc).__name__}: {exc}")
+    except Exception:  # noqa: BLE001
+        return _error_demo(traceback.format_exc())
     editor = SceneEditor(session.env)
     default_tasks = task_choices(default_suite)
     default_label = default_tasks[0] if default_tasks else ""

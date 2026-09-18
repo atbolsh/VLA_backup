@@ -1,33 +1,23 @@
 #!/usr/bin/env python3
-"""Point ~/.libero/config.yaml at the cloned LIBERO package."""
+"""Point LIBERO_CONFIG_PATH and ~/.libero/config.yaml at the cloned LIBERO package."""
 
 from __future__ import annotations
 
-import os
+import sys
 from pathlib import Path
 
-import yaml
-
 ROOT = Path(__file__).resolve().parents[1]
-PKG = ROOT / "vendor" / "LIBERO" / "libero" / "libero"
+src = ROOT / "src"
+if str(src) not in sys.path:
+    sys.path.insert(0, str(src))
+
+from roboenv.env.libero_home import prepare_libero  # noqa: E402
 
 
 def main() -> int:
-    if not PKG.is_dir():
-        raise SystemExit(f"LIBERO package not found at {PKG}")
-    cfg = {
-        "benchmark_root": str(PKG),
-        "bddl_files": str(PKG / "bddl_files"),
-        "init_states": str(PKG / "init_files"),
-        "datasets": str(ROOT / "vendor" / "LIBERO" / "datasets"),
-        "assets": str(PKG / "assets"),
-    }
-    dest = Path(os.path.expanduser("~")) / ".libero" / "config.yaml"
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
+    dest = prepare_libero()
     print(f"wrote {dest}")
-    for key, path in cfg.items():
-        print(f"  {key}: {path}  exists={Path(path).exists()}")
+    print(f"LIBERO_CONFIG_PATH={dest.parent}")
     return 0
 
 

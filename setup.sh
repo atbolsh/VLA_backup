@@ -38,62 +38,67 @@ done
 echo "Using $($PY --version)"
 
 [[ -d .venv ]] || "$PY" -m venv .venv
+VENV_PY="${HERE}/.venv/bin/python"
 # shellcheck disable=SC1091
 source .venv/bin/activate
-python -m pip install -U pip wheel
+export PATH="${HERE}/.venv/bin:${PATH}"
+export PYTHONNOUSERSITE=1
+hash -r 2>/dev/null || true
+"$VENV_PY" -m pip install -U pip wheel
 
 CU128="https://download.pytorch.org/whl/cu128"
 CU126="https://download.pytorch.org/whl/cu126"
 TORCH_RUNG=""
 
-if _try python -m pip install "torch==2.7.0" "torchvision==0.22.0" --index-url "$CU128"; then
+if _try "$VENV_PY" -m pip install "torch==2.7.0" "torchvision==0.22.0" --index-url "$CU128"; then
   TORCH_RUNG="2.7.0+cu128"
-elif _try python -m pip install "torch==2.8.0" --index-url "$CU128"; then
-  _try python -m pip install torchvision --index-url "$CU128"
+elif _try "$VENV_PY" -m pip install "torch==2.8.0" --index-url "$CU128"; then
+  _try "$VENV_PY" -m pip install torchvision --index-url "$CU128"
   TORCH_RUNG="2.8.0+cu128"
-elif [[ "${FORCE_SETUP:-}" == "1" ]] && _try python -m pip install "torch==2.7.0" "torchvision==0.22.0" --index-url "$CU126"; then
+elif [[ "${FORCE_SETUP:-}" == "1" ]] && _try "$VENV_PY" -m pip install "torch==2.7.0" "torchvision==0.22.0" --index-url "$CU126"; then
   TORCH_RUNG="2.7.0+cu126"
 else
   echo "Could not install a CUDA torch wheel. Set FORCE_SETUP=1 to try cu126." >&2
   exit 1
 fi
 
-_try python -m pip install "transformers>=4.49,<4.58"
-if ! _try python -m pip install -r requirements.txt; then
+_try "$VENV_PY" -m pip install "transformers>=4.49,<4.58"
+if ! _try "$VENV_PY" -m pip install -r requirements.txt; then
   echo "requirements.txt failed; installing a lean set, then lerobot --no-deps."
-  _try python -m pip install accelerate safetensors "huggingface-hub>=0.34.2,<1.0" pillow numpy einops \
+  _try "$VENV_PY" -m pip install accelerate safetensors "huggingface-hub>=0.34.2,<1.0" pillow numpy einops \
     sentencepiece protobuf qwen-vl-utils python-dotenv requests pyyaml \
     "transformers>=4.49,<4.58" "datasets>=2.19.0,<=3.6.0" "diffusers>=0.27.2,<0.39" \
     "opencv-python-headless>=4.9.0" "av>=14.2.0" "draccus==0.10.0" \
     gymnasium transforms3d "gradio>=4.44,<6" imageio imageio-ffmpeg tqdm tyro
-  _try python -m pip install "lerobot==0.3.3" --no-deps
+  _try "$VENV_PY" -m pip install "lerobot==0.3.3" --no-deps
 fi
 
-_try python -m pip install "huggingface-hub>=0.34.2,<1.0" "diffusers>=0.27.2,<0.39"
+_try "$VENV_PY" -m pip install "huggingface-hub>=0.34.2,<1.0" "diffusers>=0.27.2,<0.39"
 
 if [[ "$TORCH_RUNG" == "2.7.0+cu128" ]]; then
-  _try python -m pip install "torch==2.7.0" "torchvision==0.22.0" --index-url "$CU128"
+  _try "$VENV_PY" -m pip install "torch==2.7.0" "torchvision==0.22.0" --index-url "$CU128"
 elif [[ "$TORCH_RUNG" == "2.8.0+cu128" ]]; then
-  _try python -m pip install "torch==2.8.0" --index-url "$CU128"
-  _try python -m pip install torchvision --index-url "$CU128"
+  _try "$VENV_PY" -m pip install "torch==2.8.0" --index-url "$CU128"
+  _try "$VENV_PY" -m pip install torchvision --index-url "$CU128"
 elif [[ "$TORCH_RUNG" == "2.7.0+cu126" ]]; then
-  _try python -m pip install "torch==2.7.0" "torchvision==0.22.0" --index-url "$CU126"
+  _try "$VENV_PY" -m pip install "torch==2.7.0" "torchvision==0.22.0" --index-url "$CU126"
 fi
 
-_try python -m pip install -e "$HERE"
+_try "$VENV_PY" -m pip install -e "$HERE"
 
 # LIBERO: do not install their requirements.txt (ancient torch/transformers).
-_try python -m pip install "hydra-core>=1.2" easydict "bddl==1.0.1" future cloudpickle \
+_try "$VENV_PY" -m pip install "hydra-core>=1.2" easydict "bddl==1.0.1" future cloudpickle \
   "gym>=0.25,<0.27" matplotlib "robosuite==1.4.1" mujoco
 
 if [[ ! -d vendor/LIBERO/.git ]]; then
   mkdir -p vendor
   _try git clone --depth 1 https://github.com/Lifelong-Robot-Learning/LIBERO.git vendor/LIBERO
 fi
-_try python -m pip install -e vendor/LIBERO --no-deps
-_try python scripts/write_libero_home_config.py
+_try "$VENV_PY" -m pip install -e vendor/LIBERO --no-deps
+export LIBERO_CONFIG_PATH="${LIBERO_CONFIG_PATH:-${HERE}/.libero}"
+_try "$VENV_PY" scripts/write_libero_home_config.py
 
-python - <<'PY'
+"$VENV_PY" - <<'PY'
 import torch, sys
 print("torch", torch.__version__, torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu")
 try:
@@ -118,13 +123,13 @@ if [[ -n "${HF_TOKEN:-}" ]]; then
   export HUGGING_FACE_HUB_TOKEN="$HF_TOKEN"
 fi
 
-python - <<'PY'
+"$VENV_PY" - <<'PY'
 from huggingface_hub import snapshot_download
 snapshot_download("IPEC-COMMUNITY/EO-1-3B", local_dir="weights/EO-1-3B", local_dir_use_symlinks=False)
 print("downloaded IPEC-COMMUNITY/EO-1-3B")
 PY
 
-python scripts/build_libero_robot_config.py || echo "WARNING: robot_config builder failed; using fallback JSON"
+"$VENV_PY" scripts/build_libero_robot_config.py || echo "WARNING: robot_config builder failed; using fallback JSON"
 
 {
   echo "torch=$TORCH_RUNG"

@@ -8,6 +8,7 @@ build/
 
 weights/
 vendor/LIBERO/
+.libero/
 .gradio_token
 .env
 .rung

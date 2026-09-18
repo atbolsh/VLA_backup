@@ -10,12 +10,17 @@ if [[ "${1:-}" == "--scene" ]]; then
   SCENE=1
 fi
 
-if [[ ! -d .venv ]]; then
-  echo "No .venv. Run: bash setup.sh" >&2
+VENV_PY="${HERE}/.venv/bin/python"
+if [[ ! -x "$VENV_PY" ]]; then
+  echo "No .venv/bin/python. Run: bash setup.sh" >&2
   exit 1
 fi
+# Conda (vast.ai often has `(main)` on PATH) must not steal `python`.
 # shellcheck disable=SC1091
 source .venv/bin/activate
+export PATH="${HERE}/.venv/bin:${PATH}"
+export PYTHONNOUSERSITE=1
+hash -r 2>/dev/null || true
 
 if [[ -f "$HERE/.env" ]]; then
   set -a
@@ -25,7 +30,19 @@ if [[ -f "$HERE/.env" ]]; then
 fi
 
 export MUJOCO_GL="${MUJOCO_GL:-egl}"
-export PYTHONPATH="${HERE}/src${PYTHONPATH:+:$PYTHONPATH}"
+export LIBERO_CONFIG_PATH="${LIBERO_CONFIG_PATH:-${HERE}/.libero}"
+export PYTHONPATH="${HERE}/src"
+if [[ -d "${HERE}/vendor/LIBERO" ]]; then
+  PYTHONPATH="${PYTHONPATH}:${HERE}/vendor/LIBERO"
+fi
+if [[ -n "${PYTHONPATH_EXTRA:-}" ]]; then
+  PYTHONPATH="${PYTHONPATH}:${PYTHONPATH_EXTRA}"
+fi
+export PYTHONPATH
+
+if ! "$VENV_PY" "${HERE}/scripts/write_libero_home_config.py"; then
+  echo "WARNING: could not write LIBERO config (vendor/LIBERO missing?)." >&2
+fi
 
 PORT="${ROBOENV_PORT:-${PORT:-7860}}"
 export ROBOENV_PORT="$PORT"
@@ -48,7 +65,7 @@ elif [[ -f "$HERE/.gradio_token" ]]; then
   PASS_SRC=".gradio_token"
 fi
 if [[ -z "$PASS" ]]; then
-  PASS="$(python - <<'PY'
+  PASS="$("$VENV_PY" - <<'PY'
 import secrets
 print(secrets.token_urlsafe(24))
 PY
@@ -97,9 +114,10 @@ echo "   cat ${HERE}/.gradio_token"
 echo
 echo " Optional: set OPEN_BUTTON_PORT=${PORT} on the instance so the Open"
 echo " button hits this app. Do not use Gradio share links."
+echo " python:    ${VENV_PY}"
 echo "============================================================"
 
 if [[ "$SCENE" -eq 1 ]]; then
-  exec python -m roboenv.ui.scene_app
+  exec "$VENV_PY" -m roboenv.ui.scene_app
 fi
-exec python -m roboenv.ui.app
+exec "$VENV_PY" -m roboenv.ui.app
