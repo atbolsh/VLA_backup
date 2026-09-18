@@ -154,34 +154,6 @@ def _patch_robosuite_joint_addrs() -> None:
     MjModel.get_joint_qvel_addr = get_joint_qvel_addr
 
 
-def _patch_robosuite_gl_current() -> None:
-    """CUDA steals the EGL context; robosuite 1.4 render() never make_current()."""
-    from robosuite.utils.binding_utils import MjRenderContext
-
-    if getattr(MjRenderContext.render, "_roboenv_gl", False):
-        return
-
-    orig_render = MjRenderContext.render
-    orig_read = MjRenderContext.read_pixels
-
-    def _current(self) -> None:
-        gl = getattr(self, "gl_ctx", None)
-        if gl is not None and hasattr(gl, "make_current"):
-            gl.make_current()
-
-    def render(self, *args, **kwargs):
-        _current(self)
-        return orig_render(self, *args, **kwargs)
-
-    def read_pixels(self, *args, **kwargs):
-        _current(self)
-        return orig_read(self, *args, **kwargs)
-
-    render._roboenv_gl = True  # type: ignore[attr-defined]
-    MjRenderContext.render = render
-    MjRenderContext.read_pixels = read_pixels
-
-
 def ensure_mujoco_for_libero() -> None:
     prepare_mujoco_gl()
     if _mujoco_version() >= _MUJOCO_TOO_NEW:
@@ -192,7 +164,6 @@ def ensure_mujoco_for_libero() -> None:
             "then bash launch.sh"
         )
     _patch_robosuite_joint_addrs()
-    _patch_robosuite_gl_current()
 
 
 def _patch_libero_init_state_load() -> None:

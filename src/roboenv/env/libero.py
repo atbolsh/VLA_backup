@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -61,6 +62,7 @@ class LiberoEnv:
         self.done = False
         self.truncated = False
         self._obs: dict[str, Any] | None = None
+        self._gl_thread: int | None = None
         self.open(suite, task_id)
 
     @property
@@ -81,15 +83,60 @@ class LiberoEnv:
     def sim(self) -> Any:
         return self._env.sim
 
-    def rebind_gl(self) -> None:
-        """Make the offscreen EGL context current after CUDA work."""
+    def _drop_offscreen(self) -> int:
+        sim = getattr(self._env, "sim", None)
+        if sim is None:
+            return -1
+        old = getattr(sim, "_render_context_offscreen", None)
+        device_id = getattr(old, "device_id", -1) if old is not None else -1
+        if old is None:
+            return device_id
+        for attr in ("con", "gl_ctx"):
+            obj = getattr(old, attr, None)
+            if obj is None:
+                continue
+            for name in ("free", "close"):
+                fn = getattr(obj, name, None)
+                if callable(fn):
+                    try:
+                        fn()
+                    except Exception:
+                        pass
+        try:
+            sim._render_context_offscreen = None
+        except Exception:
+            pass
+        return int(device_id)
+
+    def _recreate_offscreen(self) -> None:
+        from robosuite.utils.binding_utils import MjRenderContextOffscreen
+
         if self._env is None:
             return
-        sim = getattr(self._env, "sim", None)
-        ctx = getattr(sim, "_render_context_offscreen", None) if sim is not None else None
-        gl = getattr(ctx, "gl_ctx", None) if ctx is not None else None
-        if gl is not None and hasattr(gl, "make_current"):
-            gl.make_current()
+        try:
+            import torch
+
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+        except Exception:
+            pass
+        device_id = self._drop_offscreen()
+        ctx = MjRenderContextOffscreen(
+            self._env.sim,
+            device_id=device_id,
+            max_width=self.resolution,
+            max_height=self.resolution,
+        )
+        ctx.vopt.geomgroup[0] = 0
+        ctx.vopt.geomgroup[1] = 1
+        self._gl_thread = threading.get_ident()
+
+    def rebind_gl(self, *, force: bool = False) -> None:
+        """EGL contexts are per-thread and die after CUDA. Recreate, do not make_current."""
+        if self._env is None:
+            return
+        if force or self._gl_thread != threading.get_ident():
+            self._recreate_offscreen()
 
     def close(self) -> None:
         if self._env is not None:
@@ -116,6 +163,7 @@ class LiberoEnv:
         )
         env.seed(self.seed)
         self._env = env
+        self._gl_thread = threading.get_ident()
         self._initial_states = _load_task_init_states(suite_obj, task_id)
         self.suite = suite
         self.task_id = task_id
@@ -172,6 +220,7 @@ class LiberoEnv:
     def set_sim_state(self, state: np.ndarray) -> LiberoObs:
         if self._env is None:
             raise RuntimeError("env is closed")
+        self.rebind_gl()
         self._obs = self._env.set_init_state(np.asarray(state))
         return self.observation()
 

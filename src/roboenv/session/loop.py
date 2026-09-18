@@ -144,6 +144,7 @@ class Session:
                 if instruction is not None:
                     self.set_instruction(instruction)
             policy = self.ensure_policy()
+            self.env.rebind_gl(force=True)
             replan = self.catalog.replan_steps
             while True:
                 if self._interrupt.is_set():
@@ -173,7 +174,7 @@ class Session:
                     yield self._tick(note=f"generate failed: {type(exc).__name__}: {exc}")
                     return
                 self._append_language(result.text, result.path)
-                self.env.rebind_gl()
+                self.env.rebind_gl(force=True)
                 yield self._tick(note="language ready", extras={"path": result.path})
 
                 if self._interrupt.is_set():

@@ -20,13 +20,7 @@ from roboenv.paths import default_ckpt, robot_config_path
 
 ASK_SUFFIX = "In one English sentence, what is the next subtask you will execute?"
 # Official VL-eval sampling, but short enough for a live loop.
-ASK_GEN = dict(
-    max_new_tokens=128,
-    top_p=0.001,
-    top_k=1,
-    temperature=0.01,
-    repetition_penalty=1.0,
-)
+ASK_GEN = dict(max_new_tokens=128, repetition_penalty=1.0)
 
 
 @dataclass
@@ -111,7 +105,7 @@ class EO1Policy:
             AutoModel.from_pretrained(
                 str(self.weights),
                 trust_remote_code=True,
-                torch_dtype=torch.bfloat16,
+                dtype=torch.bfloat16,
             )
             .eval()
             .to(device)
