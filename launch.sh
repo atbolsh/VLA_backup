@@ -30,6 +30,13 @@ if [[ -f "$HERE/.env" ]]; then
 fi
 
 export MUJOCO_GL="${MUJOCO_GL:-egl}"
+if [[ "$MUJOCO_GL" == "osmesa" ]]; then
+  if ! "$VENV_PY" -c 'import ctypes.util, sys; sys.exit(0 if ctypes.util.find_library("OSMesa") or ctypes.util.find_library("osmesa") else 1)'; then
+    echo "OSMesa library missing on this box; using EGL."
+    export MUJOCO_GL=egl
+  fi
+fi
+export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-${MUJOCO_GL}}"
 export LIBERO_CONFIG_PATH="${LIBERO_CONFIG_PATH:-${HERE}/.libero}"
 export PYTHONPATH="${HERE}/src"
 if [[ -d "${HERE}/vendor/LIBERO" ]]; then

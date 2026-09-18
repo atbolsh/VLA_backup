@@ -14,6 +14,26 @@ PINNED_MUJOCO = "3.3.2"
 _MUJOCO_TOO_NEW = (3, 10, 0)
 
 
+def _osmesa_available() -> bool:
+    import ctypes.util
+
+    return bool(ctypes.util.find_library("OSMesa") or ctypes.util.find_library("osmesa"))
+
+
+def prepare_mujoco_gl() -> str:
+    """Pick a GL backend before the first `import mujoco`. vast.ai has no OSMesa."""
+    requested = (os.environ.get("MUJOCO_GL") or "egl").strip().lower()
+    if requested == "osmesa" and not _osmesa_available():
+        os.environ["MUJOCO_GL"] = "egl"
+        os.environ["PYOPENGL_PLATFORM"] = "egl"
+        return "egl"
+    if requested in ("", "egl"):
+        os.environ["MUJOCO_GL"] = "egl"
+        if not os.environ.get("PYOPENGL_PLATFORM"):
+            os.environ["PYOPENGL_PLATFORM"] = "egl"
+    return os.environ.get("MUJOCO_GL", "egl")
+
+
 def vendor_libero_root() -> Path:
     return repo_root() / "vendor" / "LIBERO"
 
@@ -73,10 +93,17 @@ def prepare_libero() -> Path:
 
 
 def _mujoco_version() -> tuple[int, ...]:
-    import mujoco
+    raw = ""
+    try:
+        from importlib.metadata import version
 
+        raw = version("mujoco")
+    except Exception:
+        import mujoco
+
+        raw = mujoco.__version__
     parts: list[int] = []
-    for token in mujoco.__version__.split("."):
+    for token in raw.split("."):
         digits = "".join(ch for ch in token if ch.isdigit())
         if not digits:
             break
@@ -127,17 +154,45 @@ def _patch_robosuite_joint_addrs() -> None:
     MjModel.get_joint_qvel_addr = get_joint_qvel_addr
 
 
-def ensure_mujoco_for_libero() -> None:
-    import mujoco
+def _patch_robosuite_gl_current() -> None:
+    """CUDA steals the EGL context; robosuite 1.4 render() never make_current()."""
+    from robosuite.utils.binding_utils import MjRenderContext
 
+    if getattr(MjRenderContext.render, "_roboenv_gl", False):
+        return
+
+    orig_render = MjRenderContext.render
+    orig_read = MjRenderContext.read_pixels
+
+    def _current(self) -> None:
+        gl = getattr(self, "gl_ctx", None)
+        if gl is not None and hasattr(gl, "make_current"):
+            gl.make_current()
+
+    def render(self, *args, **kwargs):
+        _current(self)
+        return orig_render(self, *args, **kwargs)
+
+    def read_pixels(self, *args, **kwargs):
+        _current(self)
+        return orig_read(self, *args, **kwargs)
+
+    render._roboenv_gl = True  # type: ignore[attr-defined]
+    MjRenderContext.render = render
+    MjRenderContext.read_pixels = read_pixels
+
+
+def ensure_mujoco_for_libero() -> None:
+    prepare_mujoco_gl()
     if _mujoco_version() >= _MUJOCO_TOO_NEW:
         raise RuntimeError(
-            f"mujoco {mujoco.__version__} is too new for robosuite 1.4 / LIBERO. "
+            f"mujoco {'.'.join(str(x) for x in _mujoco_version())} is too new for robosuite 1.4 / LIBERO. "
             "Do not rerun setup.sh. On the box:\n"
             f"  .venv/bin/python -m pip install 'mujoco=={PINNED_MUJOCO}'\n"
             "then bash launch.sh"
         )
     _patch_robosuite_joint_addrs()
+    _patch_robosuite_gl_current()
 
 
 def _patch_libero_init_state_load() -> None:

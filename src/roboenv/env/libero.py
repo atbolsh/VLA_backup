@@ -81,6 +81,16 @@ class LiberoEnv:
     def sim(self) -> Any:
         return self._env.sim
 
+    def rebind_gl(self) -> None:
+        """Make the offscreen EGL context current after CUDA work."""
+        if self._env is None:
+            return
+        sim = getattr(self._env, "sim", None)
+        ctx = getattr(sim, "_render_context_offscreen", None) if sim is not None else None
+        gl = getattr(ctx, "gl_ctx", None) if ctx is not None else None
+        if gl is not None and hasattr(gl, "make_current"):
+            gl.make_current()
+
     def close(self) -> None:
         if self._env is not None:
             try:
@@ -116,6 +126,7 @@ class LiberoEnv:
     def reset(self, init_index: int = 0, state: np.ndarray | None = None) -> LiberoObs:
         if self._env is None:
             raise RuntimeError("env is closed")
+        self.rebind_gl()
         self._env.reset()
         if state is not None:
             raw = self._env.set_init_state(np.asarray(state))
@@ -143,6 +154,7 @@ class LiberoEnv:
     def step(self, action, *, count: bool = True) -> LiberoObs:
         if self._env is None:
             raise RuntimeError("env is closed")
+        self.rebind_gl()
         act = np.asarray(action, dtype=np.float32).reshape(-1)
         if act.size < 7:
             raise ValueError(f"LIBERO action must be 7-d, got {act.shape}")

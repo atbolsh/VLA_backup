@@ -173,6 +173,7 @@ class Session:
                     yield self._tick(note=f"generate failed: {type(exc).__name__}: {exc}")
                     return
                 self._append_language(result.text, result.path)
+                self.env.rebind_gl()
                 yield self._tick(note="language ready", extras={"path": result.path})
 
                 if self._interrupt.is_set():
